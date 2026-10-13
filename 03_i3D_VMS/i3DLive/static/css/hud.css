@@ -1,0 +1,59 @@
+#hud {
+    position: absolute;			/* mentioned in templates/hud.html file, will overwirte these values*/
+    left: 0px				/* mentioned in templates/hud.html file, will overwirte these values */
+    top: 0px;   			/* mentioned in templates/hud.html file, will overwirte these values */
+    /* right: 20px; */ 			/* mentioned in templates/hud.html file, will overwirte these values */
+    width: 300px;			/* mentioned in templates/hud.html file, will overwirte these values */
+    background: rgba(0,20,40,0.95);	/* mentioned in templates/hud.html file, will overwirte these values */
+    border: 2px solid #00ff88;
+    border-radius: 8px;
+    padding: 15px;			/* mentioned in templates/hud.html file, will overwirte these values */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(10px);
+    z-index: 1000;			/* mentioned in templates/hud.html file, will overwirte these values */
+    font-family: monospace;		/* mentioned in templates/hud.html file, will overwirte these values */
+    color: #00ff88;			/* mentioned in templates/hud.html file, will overwirte these values */
+    box-shadow: 0 8px 32px rgba(0,255,136,0.3);
+}
+
+.device-hud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #00ff88;
+    padding-bottom: 8px;
+}
+
+.device-hud-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #ffffff;
+}
+
+.status-field {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+    padding: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
+.status-healthy { color: #00ff88; }
+.status-alarm { color: #ff4444; }
+.status-warning { color: #ffaa00; }
+
+.btn-device-view {
+    width: 100%;
+    padding: 8px;
+    background: linear-gradient(45deg, #00ff88, #00cc66);
+    border: none;
+    border-radius: 4px;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=i3DLive 8 VMS Apps Service (Temporary Dev Path)
+After=network.target netbox.service nginx.service
+
+[Service]
+Type=simple
+User=g2cimsdev
+WorkingDirectory=/home/g2cimsdev/i3D_VMS/02_i3D_VMS_01_05_Jun_2026_UnderProgress
+ExecStart=/bin/bash /home/g2cimsdev/i3D_VMS/02_i3D_VMS_01_05_Jun_2026_UnderProgress/start_all_UnderProgress.sh
+
+KillMode=mixed
+TimeoutStopSec=10
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

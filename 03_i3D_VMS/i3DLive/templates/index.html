@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>3D Server Rack Animation</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+    {% include 'hud.html' %}
+
+    <!-- DO NOT DISTURB THE ORDER -->
+
+    {% for file in lib_files %}
+       <script src="{{ url_for('static', filename='js/device_library/' + file) }}"></script>
+    {% endfor %}
+
+    {% for file in layout_files %}
+       <script src="{{ url_for('static', filename='js/main_layout/' + file) }}"></script>
+    {% endfor %}
+
+    {% for file in root_js_files %}
+       <script src="{{ url_for('static', filename='js/' + file) }}"></script>
+    {% endfor %}
+
+<script>
+        // Use a small timeout or DOMContentLoaded to ensure 02_mainlayout.js is ready
+        window.addEventListener('load', function() {
+            // Convert the Python list of layout files into a JS array
+            window.layoutFiles = {{ layout_files | tojson }};
+            
+            // console.log("Layout files detected:", window.layoutFiles);
+            
+            // Call the mainlayout function defined in 02_mainlayout.js
+            if (typeof mainlayout === 'function') {
+                mainlayout();
+            } else {
+                console.error("Critical Error: mainlayout function not found. Check if 02_mainlayout.js is loaded correctly.");
+            }
+        });
+</script>
+
+</body>
+</html>

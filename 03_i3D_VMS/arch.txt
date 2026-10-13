@@ -1,0 +1,278 @@
+.
+├── arch.txt
+├── build_app_1_WorkingPerfect_1.sh
+├── build_app_1_WorkingPerfect_2.sh
+├── build_app_1_WorkingPerfect_3.sh
+├── i3DLive
+│   ├── editor.py
+│   ├── i3DLiveDev.py
+│   ├── i3DLive.service
+│   ├── incoming_restore.zip
+│   ├── static
+│   │   ├── audio
+│   │   │   └── siren.wav
+│   │   ├── css
+│   │   │   ├── editor.css
+│   │   │   └── hud.css
+│   │   └── js
+│   │       ├── 01_globallayout.js
+│   │       ├── 02_mainlayout.js
+│   │       ├── 03_hud.js
+│   │       ├── 04_controls.js
+│   │       ├── 05_zbx_com.js
+│   │       ├── 06_netbox_com.js
+│   │       ├── 07_mouse_hover.js
+│   │       ├── 08_audio_helper.js
+│   │       ├── 99_CSS3DRenderer.js.backup
+│   │       ├── 99_GLTFLoader.js.backup
+│   │       ├── 99_HTMLMesh.js.backup
+│   │       ├── 99_OrbitControls.js
+│   │       ├── 99_three.min.js
+│   │       ├── device_library
+│   │       │   ├── aislecontainment.js
+│   │       │   ├── batterybank.js
+│   │       │   ├── BioMetric.js
+│   │       │   ├── box.js
+│   │       │   ├── cabletray.js
+│   │       │   ├── cassetteac.js
+│   │       │   ├── container.js
+│   │       │   ├── containerTemplate.js
+│   │       │   ├── digitalclock.js
+│   │       │   ├── door.js
+│   │       │   ├── electricalpanel.js
+│   │       │   ├── energymeter.js
+│   │       │   ├── energymeter.js.backup
+│   │       │   ├── firealarmpanel.js
+│   │       │   ├── gasreleasecylinder.js
+│   │       │   ├── inrow.js
+│   │       │   ├── MCP.js
+│   │       │   ├── perforatedtiles.js
+│   │       │   ├── pipe.js
+│   │       │   ├── precisionac.js
+│   │       │   ├── room.js
+│   │       │   ├── roomTemplate.js
+│   │       │   ├── serverrack.js
+│   │       │   ├── smokedetector.js
+│   │       │   ├── splitac.js
+│   │       │   ├── textures
+│   │       │   │   ├── batterybank1_front.png
+│   │       │   │   ├── Battery_Bank_1.png
+│   │       │   │   ├── batterybank2_front.png
+│   │       │   │   ├── BioMetric1_front.png
+│   │       │   │   ├── cassetteac1_front.png
+│   │       │   │   ├── container_back.png
+│   │       │   │   ├── container_left.png
+│   │       │   │   ├── container_right.png
+│   │       │   │   ├── electricalpanel1_front.png
+│   │       │   │   ├── Electrical_Panel_1.png
+│   │       │   │   ├── energymeter1_front.png
+│   │       │   │   ├── firealarmpanel1_front.png
+│   │       │   │   ├── inrow1_back.png
+│   │       │   │   ├── inrow1_front.png
+│   │       │   │   ├── inrow2_back.png
+│   │       │   │   ├── inrow2_front.png
+│   │       │   │   ├── inrow3_back.png
+│   │       │   │   ├── inrow3_front.png
+│   │       │   │   ├── inrow4_back.png
+│   │       │   │   ├── inrow4_front.png
+│   │       │   │   ├── MCP1_front.png
+│   │       │   │   ├── MCP2_front.png
+│   │       │   │   ├── serverrack1_back.png
+│   │       │   │   ├── serverrack1_front.png
+│   │       │   │   ├── serverrack2_back.png
+│   │       │   │   ├── serverrack2_front.png
+│   │       │   │   ├── serverrack3_back.png
+│   │       │   │   ├── serverrack3_front.png
+│   │       │   │   ├── serverrack4_back.png
+│   │       │   │   ├── serverrack4_front.png
+│   │       │   │   ├── serverrack5_back.png
+│   │       │   │   ├── serverrack5_front.png
+│   │       │   │   ├── serverrack6_back.png
+│   │       │   │   ├── serverrack6_front.png
+│   │       │   │   ├── serverrack7_back.png
+│   │       │   │   ├── serverrack7_front.png
+│   │       │   │   ├── serverrack8_back.png
+│   │       │   │   ├── serverrack8_front.png
+│   │       │   │   ├── serverrack9_back.png
+│   │       │   │   ├── serverrack9_front.png
+│   │       │   │   ├── ups1_back.png
+│   │       │   │   ├── ups1_front.png
+│   │       │   │   ├── ups2_back.png
+│   │       │   │   ├── ups2_front.png
+│   │       │   │   ├── ups_back.png
+│   │       │   │   ├── ups_front.png
+│   │       │   │   ├── verticalpdu1_front.png
+│   │       │   │   ├── verticalpdu2_front.png
+│   │       │   │   ├── verticalpdu3_front.png
+│   │       │   │   ├── verticalpdu4_front.png
+│   │       │   │   ├── verticalpdu5_front.png
+│   │       │   │   ├── verticalpdu6_front.png
+│   │       │   │   ├── verticalpdu7_front.png
+│   │       │   │   ├── verticalpdu8_front.png
+│   │       │   │   └── vesdapanel1_front.png
+│   │       │   ├── ups.js
+│   │       │   ├── verticalpdu.js
+│   │       │   └── vesdapanel.js
+│   │       ├── editor
+│   │       │   └── editor.js
+│   │       ├── main_layout
+│   │       │   └── containerroom.js
+│   │       └── test
+│   │           ├── 01_zbxpy_value_valuemap_units.py
+│   │           ├── 02_zbxtriggers.py
+│   │           └── 03_zbxtriggers.py
+│   └── templates
+│       ├── editor.html
+│       ├── hud.html
+│       └── index.html
+├── i3DLive_Binary
+│   ├── build
+│   │   ├── 3DLive_20260420_1552_5052
+│   │   │   ├── 3DLive_20260420_1552_5052.pkg
+│   │   │   ├── Analysis-00.toc
+│   │   │   ├── base_library.zip
+│   │   │   ├── EXE-00.toc
+│   │   │   ├── localpycs
+│   │   │   │   ├── pyimod01_archive.pyc
+│   │   │   │   ├── pyimod02_importers.pyc
+│   │   │   │   ├── pyimod03_ctypes.pyc
+│   │   │   │   └── struct.pyc
+│   │   │   ├── PKG-00.toc
+│   │   │   ├── PYZ-00.pyz
+│   │   │   ├── PYZ-00.toc
+│   │   │   ├── warn-3DLive_20260420_1552_5052.txt
+│   │   │   └── xref-3DLive_20260420_1552_5052.html
+│   │   └── lib.linux-x86_64-cpython-312
+│   │       ├── i3DLiveDev.cpython-312-x86_64-linux-gnu.so
+│   │       └── vault.cpython-312-x86_64-linux-gnu.so
+│   ├── dist
+│   │   └── 3DLive_20260420_1552_5052
+│   ├── i3DLiveDev.c
+│   ├── i3DLiveDev.cpython-312-x86_64-linux-gnu.so
+│   ├── i3DLive.service
+│   ├── incoming_restore.zip
+│   ├── static
+│   │   ├── audio
+│   │   │   └── siren.wav
+│   │   ├── css
+│   │   │   ├── editor.css
+│   │   │   └── hud.css
+│   │   └── js
+│   │       ├── 01_globallayout.js
+│   │       ├── 02_mainlayout.js
+│   │       ├── 03_hud.js
+│   │       ├── 04_controls.js
+│   │       ├── 05_zbx_com.js
+│   │       ├── 06_netbox_com.js
+│   │       ├── 07_mouse_hover.js
+│   │       ├── 08_audio_helper.js
+│   │       ├── 99_CSS3DRenderer.js.backup
+│   │       ├── 99_GLTFLoader.js.backup
+│   │       ├── 99_HTMLMesh.js.backup
+│   │       ├── 99_OrbitControls.js
+│   │       ├── 99_three.min.js
+│   │       ├── device_library
+│   │       │   ├── aislecontainment.js
+│   │       │   ├── batterybank.js
+│   │       │   ├── BioMetric.js
+│   │       │   ├── box.js
+│   │       │   ├── cabletray.js
+│   │       │   ├── cassetteac.js
+│   │       │   ├── container.js
+│   │       │   ├── containerTemplate.js
+│   │       │   ├── digitalclock.js
+│   │       │   ├── door.js
+│   │       │   ├── electricalpanel.js
+│   │       │   ├── energymeter.js
+│   │       │   ├── energymeter.js.backup
+│   │       │   ├── firealarmpanel.js
+│   │       │   ├── gasreleasecylinder.js
+│   │       │   ├── inrow.js
+│   │       │   ├── MCP.js
+│   │       │   ├── perforatedtiles.js
+│   │       │   ├── pipe.js
+│   │       │   ├── precisionac.js
+│   │       │   ├── room.js
+│   │       │   ├── roomTemplate.js
+│   │       │   ├── serverrack.js
+│   │       │   ├── smokedetector.js
+│   │       │   ├── splitac.js
+│   │       │   ├── textures
+│   │       │   │   ├── batterybank1_front.png
+│   │       │   │   ├── Battery_Bank_1.png
+│   │       │   │   ├── batterybank2_front.png
+│   │       │   │   ├── BioMetric1_front.png
+│   │       │   │   ├── cassetteac1_front.png
+│   │       │   │   ├── container_back.png
+│   │       │   │   ├── container_left.png
+│   │       │   │   ├── container_right.png
+│   │       │   │   ├── electricalpanel1_front.png
+│   │       │   │   ├── Electrical_Panel_1.png
+│   │       │   │   ├── energymeter1_front.png
+│   │       │   │   ├── firealarmpanel1_front.png
+│   │       │   │   ├── inrow1_back.png
+│   │       │   │   ├── inrow1_front.png
+│   │       │   │   ├── inrow2_back.png
+│   │       │   │   ├── inrow2_front.png
+│   │       │   │   ├── inrow3_back.png
+│   │       │   │   ├── inrow3_front.png
+│   │       │   │   ├── inrow4_back.png
+│   │       │   │   ├── inrow4_front.png
+│   │       │   │   ├── MCP1_front.png
+│   │       │   │   ├── MCP2_front.png
+│   │       │   │   ├── serverrack1_back.png
+│   │       │   │   ├── serverrack1_front.png
+│   │       │   │   ├── serverrack2_back.png
+│   │       │   │   ├── serverrack2_front.png
+│   │       │   │   ├── serverrack3_back.png
+│   │       │   │   ├── serverrack3_front.png
+│   │       │   │   ├── serverrack4_back.png
+│   │       │   │   ├── serverrack4_front.png
+│   │       │   │   ├── serverrack5_back.png
+│   │       │   │   ├── serverrack5_front.png
+│   │       │   │   ├── serverrack6_back.png
+│   │       │   │   ├── serverrack6_front.png
+│   │       │   │   ├── serverrack7_back.png
+│   │       │   │   ├── serverrack7_front.png
+│   │       │   │   ├── serverrack8_back.png
+│   │       │   │   ├── serverrack8_front.png
+│   │       │   │   ├── serverrack9_back.png
+│   │       │   │   ├── serverrack9_front.png
+│   │       │   │   ├── ups1_back.png
+│   │       │   │   ├── ups1_front.png
+│   │       │   │   ├── ups2_back.png
+│   │       │   │   ├── ups2_front.png
+│   │       │   │   ├── ups_back.png
+│   │       │   │   ├── ups_front.png
+│   │       │   │   ├── verticalpdu1_front.png
+│   │       │   │   ├── verticalpdu2_front.png
+│   │       │   │   ├── verticalpdu3_front.png
+│   │       │   │   ├── verticalpdu4_front.png
+│   │       │   │   ├── verticalpdu5_front.png
+│   │       │   │   ├── verticalpdu6_front.png
+│   │       │   │   ├── verticalpdu7_front.png
+│   │       │   │   ├── verticalpdu8_front.png
+│   │       │   │   └── vesdapanel1_front.png
+│   │       │   ├── ups.js
+│   │       │   ├── verticalpdu.js
+│   │       │   └── vesdapanel.js
+│   │       ├── main_layout
+│   │       │   └── containerroom.js
+│   │       └── test
+│   │           ├── 01_zbxpy_value_valuemap_units.py
+│   │           ├── 02_zbxtriggers.py
+│   │           └── 03_zbxtriggers.py
+│   ├── templates
+│   │   ├── hud.html
+│   │   └── index.html
+│   ├── vault.c
+│   └── vault.cpython-312-x86_64-linux-gnu.so
+├── installation_procedure.txt
+├── project_export.zip
+├── requirements.txt
+├── start_all.sh
+├── startEditor.sh
+├── starti3DLive.sh
+└── stop_all.sh
+
+27 directories, 249 files

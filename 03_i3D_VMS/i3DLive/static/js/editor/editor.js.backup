@@ -1,0 +1,1457 @@
+// Add at top of EditorTree class or globally
+const DECIMAL_PROPS = [
+    'deviceWidth', 'deviceHeight', 'deviceDepth',
+    'textSize', 'ledRadius', 'ledHeight', 'ledBlinkPeriod',
+    'highTextSize', 'highLineWidth', 'highDotRadius',
+    'screenSize', 'textbgSize', 'highTextbgSize',
+    'doorWidth', 'doorHeight', 'doorOffset',
+    'fanSpeed', 'fanSize', 'plugWidth'
+];
+
+class EditorTree {
+
+    constructor() {
+        this.treeContainer = document.getElementById('tree-container');
+        this.propertiesEditor = document.getElementById('props-editor');
+        this.deviceVars = {};
+        this.threeContainer = document.getElementById('three-canvas-container');
+        this.selectedFile = null;
+        this.selectedDevice = null;
+        this.selectedRoom = null;
+        this.selectedDeviceFile = null;
+        this.scene = null;  // For updatePreview
+
+        const applyBtn = document.getElementById('apply-changes-btn');
+            if (applyBtn) {
+                applyBtn.onclick = () => this.applyChanges();
+            }
+
+	if (!this.treeContainer || !this.propertiesEditor || !this.threeContainer) {
+  	    //console.error('Required DOM elements not found');
+  	    return;
+	}
+
+        // FIXED 10.1a: Add button INSIDE constructor
+        document.getElementById('add-device-btn').onclick = () => this.handleAdd();
+        document.getElementById('remove-device-btn').onclick = this.handleRemove.bind(this);
+
+
+        // Setup Room UI Buttons (The functions you added)
+        const addRoomBtn = document.getElementById('add-room-btn');
+        if(addRoomBtn) addRoomBtn.onclick = () => this.promptAddRoom();
+
+        const removeRoomBtn = document.getElementById('remove-room-btn');
+        if(removeRoomBtn) removeRoomBtn.onclick = () => this.confirmRemoveRoom();
+
+        window.promptAddRoom = () => this.promptAddRoom();
+        window.confirmRemoveRoom = () => this.confirmRemoveRoom();
+
+        window.editorScene = null;
+        window.editorCamera = null;
+        window.editorRenderer = null;
+        window.editorControls = null;
+
+        this.loadTree();
+        this.loadRoomLibrary();
+        this.loadDeviceLibrary();
+        this.initEditorThreeJS();
+    }
+
+
+    // ... keep all your existing methods (loadTree, renderTree, toggleNode, selectDevice, initEditorThreeJS, editorAnimate, 
+    // ... loadDeviceLibrary, selectLibraryDevice, loadRoomLibrary, selectLibraryRoom) ...
+
+    async loadTree() {
+        try {
+            const response = await fetch('/api/tree');
+            const treeData = await response.json();
+
+            if (treeData.error) {
+                this.treeContainer.innerHTML = `<div style="color:red;padding:20px;">Error: ${treeData.error}</div>`;
+                return;
+            }
+
+            this.renderTree(treeData);
+        } catch (error) {
+            //console.error('Failed to load tree:', error);
+            this.treeContainer.innerHTML = '<div style="color:red;padding:20px;">Failed to load file tree</div>';
+        }
+    }
+
+    renderTree(files) {
+        this.treeContainer.innerHTML = '';
+
+        files.forEach(file => {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'tree-file';
+            fileDiv.innerHTML = `
+                <div class="tree-node">
+                    <span class="toggle collapsed">▶</span>
+                    <span class="filename">${file.name}</span>
+                </div>
+                <div class="tree-children" style="display: none;">
+                    ${file.devices.map(device =>
+                        `<div class="tree-item device" data-file="${file.name}" data-device="${device.name}">
+                            ${device.name}
+                        </div>`
+                    ).join('')}
+                </div>
+            `;
+
+            fileDiv.querySelector('.tree-node').onclick = (e) => {
+                e.stopPropagation();
+                this.toggleNode(fileDiv);
+            };
+
+            fileDiv.querySelectorAll('.device').forEach(item => {
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    this.selectDevice(item.dataset.file, item.dataset.device, e.currentTarget);
+                };
+            });
+
+            this.treeContainer.appendChild(fileDiv);
+        });
+    }
+
+    toggleNode(node) {
+        const children = node.querySelector('.tree-children');
+        const toggle = node.querySelector('.toggle');
+        const isCollapsed = toggle.classList.contains('collapsed');
+
+        if (isCollapsed) {
+            children.style.display = 'block';
+            toggle.textContent = '▼';
+            toggle.classList.remove('collapsed');
+        } else {
+            children.style.display = 'none';
+            toggle.textContent = '▶';
+            toggle.classList.add('collapsed');
+        }
+    }
+
+    selectDevice(filename, device, element) {
+        document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+        element.classList.add('selected');
+
+        this.selectedFile = filename;
+        this.selectedDevice = device;
+
+        // Preview updates automatically via scoped animate()
+        //console.log(`Selected ${device} from ${filename}`);
+        this.loadDeviceProperties(filename, device);
+        //this.updatePreview(device);
+    }
+
+    // New method: Scoped Three.js init for middle pane only
+    initEditorThreeJS() {
+        // Prefix globals to avoid conflict with i3DLive.py's window globals
+        window.initEditor = () => {
+            const container = this.threeContainer;
+
+            // Clear any placeholder
+            const placeholder = container.querySelector('div');
+            if (placeholder) placeholder.remove();
+
+            // Create scoped scene/renderer/camera for editor
+            window.editorScene = new THREE.Scene();
+            window.editorScene.background = new THREE.Color(0x000000);
+
+            window.editorCamera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 200);
+            window.editorCamera.position.set(8, 8, 8);
+
+            window.editorRenderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            window.editorRenderer.setSize(container.clientWidth, container.clientHeight);
+            window.editorRenderer.shadowMap.enabled = true;
+            window.editorRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(window.editorRenderer.domElement);
+
+            // Scoped OrbitControls attached to container only
+            window.editorControls = new THREE.OrbitControls(window.editorCamera, window.editorRenderer.domElement);
+            window.editorControls.enableDamping = true;
+            window.editorControls.dampingFactor = 1.05;
+            window.editorControls.target.set(0, 1.0, 0);
+            window.editorControls.update();
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.6);
+            window.editorScene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xaaaaaa, 0.7);
+            directionalLight.position.set(5, 10, 7);
+            directionalLight.castShadow = true;
+            window.editorScene.add(directionalLight);
+
+            // Critical: Call your existing init() but scoped to editor globals
+            // Override temporarily for this call
+            const originalInit = window.init;
+            window.init = () => {
+                // Use editor globals instead of global ones
+                scene = window.editorScene;
+                camera = window.editorCamera;
+                renderer = window.editorRenderer;
+                controls = window.editorControls;
+
+                // Call your mainlayout() which loads rooms/devices
+                mainlayout();  // This populates the scoped scene
+
+                // Restore originals after
+                scene = window.editorScene;
+                camera = window.editorCamera;
+                renderer = window.editorRenderer;
+                controls = window.editorControls;
+
+                // Start scoped animate
+                this.editorAnimate();
+            };
+
+            window.init();  // Execute the scoped init()
+
+            // Resize handler for container only
+            const resizeEditor = () => {
+                const rect = container.getBoundingClientRect();
+                window.editorCamera.aspect = rect.width / rect.height;
+                window.editorCamera.updateProjectionMatrix();
+                window.editorRenderer.setSize(rect.width, rect.height);
+            };
+            window.addEventListener('resize', resizeEditor);
+            resizeEditor();  // Initial resize
+        };
+
+        // Start the editor instance
+        window.initEditor();
+        this.scene = window.editorScene;
+        window.editorInstance = this;  // Global access
+
+        //console.log('Editor Three.js initialized in middle pane');
+    }
+
+    // Scoped animate loop for editor renderer only
+    editorAnimate() {
+        requestAnimationFrame(() => this.editorAnimate());
+        if (window.editorControls) window.editorControls.update();
+        if (window.editorRenderer && window.editorScene && window.editorCamera) {
+            window.editorRenderer.render(window.editorScene, window.editorCamera);
+        }
+    }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Function to Add Room
+async promptAddRoom() {
+
+    var roomName = prompt("Enter the room name (e.g., 'Security'):");
+    
+    if (roomName && roomName.trim() !== "") {
+        // Clean the name: remove spaces and special characters
+        var cleanName = roomName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+        fetch('/add_room', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: cleanName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("Room '" + cleanName + "room.js' created successfully!");
+                location.reload(); // Refresh to include the new JS file in the DOM
+            } else {
+                alert("Error: " + data.error);
+            }
+        })
+        .catch(err => {
+            //console.error("Fetch Error:", err);
+            alert("Failed to connect to server.");
+        });
+    }
+
+}
+
+
+async confirmRemoveRoom() {
+    if (!this.selectedRoom) {
+        alert("Please select a room from the 'Room' dropdown menu first.");
+        return;
+    }
+
+    const selectedFile = this.selectedRoom;
+    const confirmed = confirm(`Are you sure you want to delete ${selectedFile}?`);
+    
+    if (confirmed) {
+        try {
+            // e.g., "serverroom.js" -> "serverroom"
+            const functionName = selectedFile.replace('.js', '');
+
+            const response = await fetch('/remove_room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: selectedFile })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                // FIX: Set to null instead of 'delete' to avoid non-configurable errors
+                if (window[functionName]) {
+                    window[functionName] = null; 
+                    //console.log(`🗑️ Cleared ${functionName} from global memory`);
+                }
+
+                alert("Room deleted successfully.");
+                this.selectedRoom = null;
+                document.querySelector('#room-library-btn .selected-text').textContent = 'Select Room...';
+                
+                await this.loadTree();
+                await this.updatePreview();
+            } else {
+                alert("Error: " + data.error);
+            }
+        } catch (err) {
+            console.error("Fetch Error:", err);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    async loadDeviceLibrary() {
+        try {
+            const response = await fetch('/api/device_library');
+            const devices = await response.json();
+
+            const dropdown = document.getElementById('device-library-dropdown');
+            const button = document.getElementById('device-library-btn');
+            dropdown.innerHTML = '';  // Clear
+
+            devices.forEach(device => {
+                const option = document.createElement('div');
+                option.className = 'dropdown-option';
+                option.dataset.filename = device.filename;
+                option.textContent = device.display;
+                option.onclick = () => this.selectLibraryDevice(device);
+                dropdown.appendChild(option);
+            });
+
+            // Click handlers
+            button.onclick = () => {
+                const isOpen = dropdown.classList.contains('show');
+                document.querySelectorAll('.select-dropdown').forEach(d => d.classList.remove('show'));
+                if (!isOpen) dropdown.classList.add('show');
+            };
+
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                if (!button.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+
+                //console.log(`Loaded ${devices.length} devices - scrollable`);
+            } catch (error) {
+                //console.error('Failed to load device library:', error);
+          }
+      }
+
+        // NEW: Handle device selection
+      selectLibraryDevice(device) {
+          const button = document.getElementById('device-library-btn');
+          const dropdown = document.getElementById('device-library-dropdown');
+          button.querySelector('.selected-text').textContent = device.display;
+          dropdown.classList.remove('show');
+          //console.log(`Selected library device: ${device.filename}`);
+
+          this.selectedDeviceFile = device.filename;
+          //console.log(`Selected device: ${device.filename}`);
+          // Add logic here later for Add button
+      }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+addEditorLights(targetScene) {
+    if (!targetScene) return;
+
+    // Set background color correctly
+    targetScene.background = new THREE.Color(0x000000); // Dark grey instead of black
+
+    // 1. Ambient Light
+    const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.6);
+    ambientLight.name = "editor_ambient";
+    targetScene.add(ambientLight);
+
+    // 2. Directional Light
+    const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.7);
+    directionalLight.position.set(5, 10, 7);
+    directionalLight.castShadow = true;
+    directionalLight.name = "editor_directional";
+    targetScene.add(directionalLight);
+
+    //console.log("💡 Lights and Background restored to target scene");
+}
+
+async updatePreview() {
+    //console.log('🔄 Dynamic Global Refresh...');
+    const targetScene = window.editorScene;
+    if (!targetScene) return;
+
+    // 1. Clear the entire preview scene
+    while (targetScene.children.length > 0) {
+        targetScene.remove(targetScene.children[0]);
+    }
+
+    this.addEditorLights(targetScene);
+    window.scene = targetScene;
+    window.camera = window.editorCamera;
+
+    try {
+        const treeResp = await fetch('/api/tree');
+        const rooms = await treeResp.json();
+        
+        // Get names like ['serverroom', 'securityroom']
+        const validRoomFunctions = rooms.map(r => r.name.replace('.js', ''));
+
+        // 2. SAFE CLEANUP: Set obsolete room functions to null
+        Object.keys(window).forEach(key => {
+            // Only target keys that end with 'room' and are not in our current valid list
+            if (key.endsWith('room') && !validRoomFunctions.includes(key) && typeof window[key] === 'function') {
+                try {
+                    window[key] = null; // Safer than 'delete' for non-configurable properties
+                    //console.log(`🧹 Nullified obsolete function: ${key}`);
+                } catch (e) {
+                    //console.warn(`Could not nullify ${key}:`, e);
+                }
+            }
+        });
+
+        for (const room of rooms) {
+            const fileName = room.name;
+            const cacheBuster = Date.now();
+            const response = await fetch(`/api/load_layout/${fileName}.js?t=${cacheBuster}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const functionMatch = data.content.match(/function\s+([a-zA-Z0-9_]+)\s*\(/);
+                const detectedFuncName = functionMatch ? functionMatch[1] : null;
+
+                if (detectedFuncName) {
+                    const scriptRunner = new Function('THREE', 'scene', 'camera', `
+                        ${data.content}
+                        if (typeof ${detectedFuncName} === 'function') {
+                            window.${detectedFuncName} = ${detectedFuncName};
+                        }
+                    `);
+                    scriptRunner(THREE, targetScene, window.editorCamera);
+                }
+            }
+        }
+
+        // 3. Re-run layout
+        if (typeof mainlayout === 'function') {
+            mainlayout();
+            console.log("✅ Render updated.");
+        }
+
+    } catch (err) {
+        console.error("❌ Dynamic global refresh failed:", err);
+    }
+
+    if (window.editorRenderer) {
+        window.editorRenderer.render(targetScene, window.editorCamera);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+      async loadRoomLibrary() {
+          try {
+                  const response = await fetch('/api/room_library');
+                  const rooms = await response.json();
+
+                  const dropdown = document.getElementById('room-library-dropdown');
+                  const button = document.getElementById('room-library-btn');
+                  dropdown.innerHTML = '';
+
+                  rooms.forEach(room => {
+                      const option = document.createElement('div');
+                      option.className = 'dropdown-option';
+                      option.dataset.filename = room.filename;
+                      option.textContent = room.display;
+                      option.onclick = () => this.selectLibraryRoom(room);
+                      dropdown.appendChild(option);
+                  });
+
+                  button.onclick = () => {
+                      const isOpen = dropdown.classList.contains('show');
+                      document.querySelectorAll('.select-dropdown').forEach(d => d.classList.remove('show'));
+                      if (!isOpen) dropdown.classList.add('show');
+                  };
+              }
+              catch (error) {
+                  //console.error('Failed to load room library:', error);
+              }
+      }
+
+      // NEW: Handle room selection
+      selectLibraryRoom(room) {
+          const button = document.getElementById('room-library-btn');
+          const dropdown = document.getElementById('room-library-dropdown');
+          button.querySelector('.selected-text').textContent = room.display;
+          dropdown.classList.remove('show');
+          this.selectedRoom = room.filename;
+          //console.log(`Selected room: ${room.filename}`);
+      }
+
+
+
+    // FIXED 10.1c: Fixed handleAdd method (add this)
+    async handleAdd() {
+        //console.log('Add clicked:', {room: this.selectedRoom, device: this.selectedDeviceFile});
+
+        if (!this.selectedRoom || !this.selectedDeviceFile) {
+            alert('Select Room AND Device first');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/add_device', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    room: this.selectedRoom,
+                    device: this.selectedDeviceFile
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                //console.log('✅ Added:', result.device_name, 'to', result.room_file);
+
+                // Reload tree (left pane updates)
+                await this.loadTree();
+                await this.updatePreview();
+
+                // Reset selectors
+                this.selectedRoom = null;
+                this.selectedDeviceFile = null;
+                document.querySelector('#room-library-btn .selected-text').textContent = 'Select Room...';
+                document.querySelector('#device-library-btn .selected-text').textContent = 'Select Device...';
+
+                //alert(`✅ Added ${result.device_name} to ${result.room_file}`);
+            } else {
+                alert('❌ Add failed: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Add error:', error);
+            alert('❌ Network error - check console');
+        }
+    }
+
+
+async handleRemove() {
+    console.log('Remove clicked, device:', this.selectedDevice, 'file:', this.selectedFile);
+
+    if (!this.selectedDevice || !this.selectedFile) {
+        //alert('Select a device from the left tree first!');
+        return;
+    }
+
+    // Highlight device in 3D (optional)
+    this.highlightDevice(this.selectedDevice);
+
+    const roomFile = this.selectedFile.endsWith('.js')
+        ? this.selectedFile
+        : this.selectedFile + '.js';
+
+    if (!confirm(`Delete "${this.selectedDevice}" from "${roomFile}"?\n\nThis removes the whole device block.`)) {
+        return; // Cancel
+    }
+
+    try {
+        const response = await fetch('/api/remove_device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                room: roomFile,
+                device_name: this.selectedDevice
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            //console.log('✅ Removed', result.device, 'from', result.room);
+            await this.loadTree();
+            await this.updatePreview();
+
+            this.selectedDevice = null;
+            document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+            //alert(`Removed ${result.device} from ${result.room}`);
+        } else {
+            alert('Remove failed: ' + result.error);
+        }
+    } catch (err) {
+        //console.error('Remove error:', err);
+        alert('Network error - check console');
+    }
+}
+
+// Simple highlight (add to existing class)
+highlightDevice(deviceName) {
+    // Pulse all objects with matching name
+    if (window.editorScene) {
+        window.editorScene.traverse((obj) => {
+            if (obj.name === deviceName || obj.userData.deviceName === deviceName) {
+                // Simple scale pulse
+                const originalScale = obj.scale.clone();
+                const pulse = () => {
+                    obj.scale.lerp(new THREE.Vector3(1.2, 1.2, 1.2), 0.1);
+                    if (obj.scale.x > 1.15) {
+                        obj.scale.copy(originalScale);
+                    } else {
+                        requestAnimationFrame(pulse);
+                    }
+                };
+                pulse();
+            }
+        });
+    }
+}
+
+async loadDeviceProperties(filename, deviceName) {
+    try {
+        // Auto .js extension is already handled in backend, but you can normalize if you like
+        const roomFile = filename.endsWith('.js') ? filename : `${filename}.js`;
+
+        const response = await fetch(
+            `/api/deviceprops?room=${encodeURIComponent(roomFile)}&device=${encodeURIComponent(deviceName)}`
+        );
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.success) {
+            //console.log('Loaded props', Object.keys(data.vars)); // debug
+            this.deviceVars = data.vars;
+            this.renderProperties(filename, deviceName);
+        } else {
+            //console.error('Backend error', data.error);
+            this.propertiesEditor.innerHTML =
+                `<div style="padding:20px;color:#666;">Failed: ${data.error}</div>`;
+        }
+    } catch (error) {
+        //console.error('Load props error:', error);
+        this.propertiesEditor.innerHTML =
+            '<div style="padding:20px;color:#666;">Network/Parse error - check console</div>';
+    }
+}
+
+/*
+renderProperties(filename, deviceName) {
+    const groups = {
+        'Basic': ['category', 'roomType', 'deviceColor', 'deviceWidth', 'deviceHeight', 'deviceDepth', 'orientation', 'standHeight', 'knobHeight', 'gaugeThickness', 'unitCount', 'pipeOrientation', 'ductOrientation', 'deviceOrientation'],
+        'Radius': ['deviceRadius', 'domeRadius', 'standRadius', 'knobRadius', 'gaugeRadius', 'pipeRadius'],
+        'Position': ['devicePosition', 'camPosition','knobPosition', 'gaugePosition'],
+        'Text Label': ['text', 'labelOrientation', 'textPosition', 'textSize', 'textColor', 'textFont', 'textCanvasBgColor', 'textbgSize'],
+        'Screen': ['screenEnabled','screenPosition', 'screenSize', 'screenColor'],
+        'Textures': ['faceTextures','plugInBoxTextures', 'endFeedTextures'],
+        'LED': ['ledEnabled', 'ledRadius', 'ledOffset', 'ledBlinkPeriod'],
+        'Live Data': ['deviceId', 'urlLink','zbxSrvIP', 'zbxAPI', 'zbxHost','NBSrvIP', 'NBAPI', 'NBRackID'], //'NBFront', 'NBRear'],
+        // SPECIAL VARIABLES
+        'Tiles': ['tileSize'],
+        'Airflow': ['airflowPercentage'],
+        'Door':['doorWidth', 'doorHeight', 'doorOffset', 'numberOfDoors', 'doorType', 'glassWidth', 'glassHeight', 'glassPosition'],
+        'TileSize':['floorTileSize', 'ceilingTileSize'],
+        'Animation':['fanEnabled', 'fanSpeed', 'fanSize', 'fanPosition', 'fanColor', 'zbxKey', 'fanOnValue'],
+        'ClockConfig':['clockType','LEDactiveColor', 'LEDdimColor', 'LEDscreenColor'],
+        //'plug':['plugCount','plugWidth'],
+        'TrayTurn':['Front_Side_Opening', 'Rear_Side_Opening'],
+        //'PipeBend':['Front_PipeBend', 'Rear_PipeBend', 'frontEndExtensionLength', 'rearEndExtensionLength'],
+        //'PipeBendStatus':['front_PipeBendStatus','rear_PipeBendStatus','front_ExtendedPipeBendStatus','rear_ExtendedPipeBendStatus'],
+        //'PipeFrontEnd':['front_PipeBendStatus','front_PipeBendHorizontalAngle','front_PipeBendVerticalAngle', 'frontEndExtensionLength'],
+        //'PipeRearEnd':['rear_PipeBendStatus','rear_PipeBendHorizontalAngle','rear_PipeBendVerticalAngle', 'rearEndExtensionLength'],
+        //'PipeFrontExtendedEnd':['front_ExtendedPipeBendStatus','front_ExtendedPipeBendHorizontalAngle','front_ExtendedPipeBendVerticalAngle','front_ExtendedPipeBendLength'],
+        //'PipeRearExtendedEnd':['rear_ExtendedPipeBendStatus','rear_ExtendedPipeBendHorizontalAngle','rear_ExtendedPipeBendVerticalAngle','rear_ExtendedPipeBendLength'],
+
+        'PipeFrontEnd':['F_B1_Sts','F_B1_H','F_B1_V', 'F_B1_L', 'F_B2_Sts', 'F_B2_H', 'F_B2_V', 'F_B2_L', 'F_B3_Sts', 'F_B3_H', 'F_B3_V', 'F_B3_L'],
+        'PipeRearEnd':['R_B1_Sts','R_B1_H','R_B1_V', 'R_B1_L', 'R_B2_Sts', 'R_B2_H', 'R_B2_V', 'R_B2_L', 'R_B3_Sts', 'R_B3_H', 'R_B3_V', 'R_B3_L'],
+        'DuctFrontEnd':['F_D1_Sts','F_D1_H','F_D1_V', 'F_D1_L', 'F_D2_Sts', 'F_D2_H', 'F_D2_V', 'F_D2_L', 'F_D3_Sts', 'F_D3_H', 'F_D3_V', 'F_D3_L'],
+        'DuctRearEnd':['R_D1_Sts','R_D1_H','R_D1_V', 'R_D1_L', 'R_D2_Sts', 'R_D2_H', 'R_D2_V', 'R_D2_L', 'R_D3_Sts', 'R_D3_H', 'R_D3_V', 'R_D3_L'],
+
+        //EDuct related
+        'PlugInBox':['numPlugInBoxes', 'plugInBoxInterval', 'plugInBoxWidth', 'plugInBoxHeight', 'plugInBoxDepth','plugInBoxPosition'],
+        'EndFeedUnit':['enableEndFeedRight', 'enableEndFeedLeft', 'endFeedWidth', 'endFeedHeight', 'endFeedDepth'],
+        ///'FeedTexture':['plugInBoxFrontTexture', 'plugInBoxBackTexture', 'endFeedFrontTexture', 'endFeedBackTexture'],
+        'Rods':['enableHangingScrews', 'numHangingScrews', 'screwLength'],
+        'EDuctAnimation':['flowAnimation','arrowFlowDirection', 'flowSpeed', 'flowColor', 'arrowIntensity', 'flowOnValue', 'zbxKey']
+
+    };
+
+    //let html = '<div style="padding:20px 0;">';
+
+    // Create the Header HTML
+    let html = `
+        <div class="device-header-title" style="
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #2c3e50; 
+            padding-bottom: 10px; 
+            margin-bottom: 15px; 
+            border-bottom: 2px solid #3498db;
+            text-transform: none;">
+            📦 ${filename.replace('.js', '')} : ${deviceName.replace('.js', '')}
+        </div>
+    `;
+
+    Object.entries(groups).forEach(([groupName, keys]) => {
+        // ✅ HIDE EMPTY GROUPS
+        const groupVars = keys.filter(key => this.deviceVars[key] !== undefined);
+        if (groupVars.length === 0) return;
+
+        html += `
+            <div class="properties-group">
+                <div class="group-header" data-group="${groupName}">
+                    <span>${groupName} (${groupVars.length})</span>
+                    <span style="font-size:12px">▼</span>
+                </div>
+                <div class="group-content">
+        `;
+
+        groupVars.forEach(key => {
+            html += this.renderProp(key, this.deviceVars[key]);
+        });
+
+        html += '</div></div>';
+    });
+
+    html += '<button class="apply-btn" onclick="editor.applyChanges()">Apply Changes</button></div>';
+    this.propertiesEditor.innerHTML = html;
+
+    // Toggle wiring
+    this.propertiesEditor.querySelectorAll('.group-header').forEach(header => {
+        header.onclick = () => {
+            const content = header.nextElementSibling;
+            content.classList.toggle('show');
+            header.lastElementChild.textContent = content.classList.contains('show') ? '▲' : '▼';
+        };
+    });
+}
+*/
+
+
+renderProperties(filename, deviceName) {
+    const groups = {
+        'Basic': ['category', 'roomType', 'deviceColor', 'deviceWidth', 'deviceHeight', 'deviceDepth', 'orientation', 'standHeight', 'knobHeight', 'gaugeThickness', 'unitCount', 'pipeOrientation', 'ductOrientation', 'deviceOrientation'],
+        'Radius': ['deviceRadius', 'domeRadius', 'standRadius', 'knobRadius', 'gaugeRadius', 'pipeRadius'],
+        'Position': ['devicePosition', 'camPosition','knobPosition', 'gaugePosition'],
+        'Text Label': ['text', 'labelOrientation', 'textPosition', 'textSize', 'textColor', 'textFont', 'textCanvasBgColor', 'textbgSize'],
+        'Screen': ['screenEnabled','screenPosition', 'screenSize', 'screenColor'],
+        'Textures': ['faceTextures','plugInBoxTextures', 'endFeedTextures'],
+        'LED': ['ledEnabled', 'ledRadius', 'ledOffset', 'ledBlinkPeriod'],
+        'Live Data': ['deviceId', 'urlLink','zbxSrvIP', 'zbxAPI', 'zbxHost','NBSrvIP', 'NBAPI', 'NBRackID'], //'NBFront', 'NBRear'],
+        // SPECIAL VARIABLES
+        'Tiles': ['tileSize'],
+        'Airflow': ['airflowPercentage'],
+        'Door':['doorWidth', 'doorHeight', 'doorOffset', 'numberOfDoors', 'doorType', 'glassWidth', 'glassHeight', 'glassPosition'],
+        'TileSize':['floorTileSize', 'ceilingTileSize'],
+        'Animation':['fanEnabled', 'fanSpeed', 'fanSize', 'fanPosition', 'fanColor', 'zbxKey', 'fanOnValue'],
+        'ClockConfig':['clockType','LEDactiveColor', 'LEDdimColor', 'LEDscreenColor'],
+        'TrayTurn':['Front_Side_Opening', 'Rear_Side_Opening'],
+
+        'PipeFrontEnd':['F_B1_Sts','F_B1_H','F_B1_V', 'F_B1_L', 'F_B2_Sts', 'F_B2_H', 'F_B2_V', 'F_B2_L', 'F_B3_Sts', 'F_B3_H', 'F_B3_V', 'F_B3_L'],
+        'PipeRearEnd':['R_B1_Sts','R_B1_H','R_B1_V', 'R_B1_L', 'R_B2_Sts', 'R_B2_H', 'R_B2_V', 'R_B2_L', 'R_B3_Sts', 'R_B3_H', 'R_B3_V', 'R_B3_L'],
+        'DuctFrontEnd':['F_D1_Sts','F_D1_H','F_D1_V', 'F_D1_L', 'F_D2_Sts', 'F_D2_H', 'F_D2_V', 'F_D2_L', 'F_D3_Sts', 'F_D3_H', 'F_D3_V', 'F_D3_L'],
+        'DuctRearEnd':['R_D1_Sts','R_D1_H','R_D1_V', 'R_D1_L', 'R_D2_Sts', 'R_D2_H', 'R_D2_V', 'R_D2_L', 'R_D3_Sts', 'R_D3_H', 'R_D3_V', 'R_D3_L'],
+
+        //EDuct related
+        'PlugInBox':['numPlugInBoxes', 'plugInBoxInterval', 'plugInBoxPositions', 'plugInBoxWidth', 'plugInBoxHeight', 'plugInBoxDepth','plugInBoxPosition'],
+        'EndFeedUnit':['enableEndFeedRight', 'enableEndFeedLeft', 'endFeedWidth', 'endFeedHeight', 'endFeedDepth'],
+        'Rods':['enableHangingScrews', 'numHangingScrews', 'screwLength'],
+        'EDuctAnimation':['flowAnimation','arrowFlowDirection', 'flowSpeed', 'flowColor', 'arrowIntensity', 'flowOnValue', 'zbxKey']
+
+    };
+
+    let html = `
+        <div class="device-header-title" style="
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            text-transform: none;">
+            📦 ${filename.replace('.js', '')} : ${deviceName.replace('.js', '')}
+        </div>
+    `;
+
+    Object.entries(groups).forEach(([groupName, keys]) => {
+        // ✅ HIDE EMPTY GROUPS
+        const groupVars = keys.filter(key => this.deviceVars[key] !== undefined);
+        if (groupVars.length === 0) return;
+
+        html += `
+            <div class="properties-group">
+                <div class="group-header" data-group="${groupName}">
+                    <span>${groupName} (${groupVars.length})</span>
+                    <span style="font-size:12px">▼</span>
+                </div>
+                <div class="group-content">
+        `;
+
+        groupVars.forEach(key => {
+            // SPECIAL CASE: Custom array input handling for plugInBoxPositions
+            if (key === 'plugInBoxPositions') {
+                const positions = Array.isArray(this.deviceVars[key]) ? this.deviceVars[key] : [];
+                const boxCount = parseInt(this.deviceVars['numPlugInBoxes']) || positions.length || 0;
+
+                html += `
+                    <div class="prop-row" style="display:flex; flex-direction:column; margin-bottom:8px;">
+                        <label style="font-size:13px; margin-bottom:4px;">plugInBoxPositions:</label>
+                        <div class="vector-inputs" style="display:flex; gap:4px; align-items:center; flex-wrap:wrap; padding-left:15px;">
+                `;
+
+                if (boxCount === 0) {
+                    html += `<span style="font-size:11px; color:#888;">No boxes enabled</span>`;
+                } else {
+                    for (let idx = 0; idx < boxCount; idx++) {
+                        const posVal = (positions[idx] !== undefined && positions[idx] !== null) ? positions[idx] : '';
+                        html += `
+                            <div style="display:flex; align-items:center; gap:2px;">
+                                <span style="font-size:11px; color:#666;">#${idx + 1}:</span>
+                                <input class="prop-input" data-key="plugInBoxPositions.${idx}" type="number" step="0.01"
+                                       value="${posVal !== '' ? parseFloat(posVal).toFixed(2) : ''}" 
+                                       placeholder="Auto" style="width:55px; padding:2px;">
+                            </div>
+                        `;
+                    }
+                }
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += this.renderProp(key, this.deviceVars[key]);
+            }
+        });
+
+        html += '</div></div>';
+    });
+
+    html += '<button class="apply-btn" onclick="editor.applyChanges()">Apply Changes</button></div>';
+    this.propertiesEditor.innerHTML = html;
+
+    // Toggle wiring
+    this.propertiesEditor.querySelectorAll('.group-header').forEach(header => {
+        header.onclick = () => {
+            const content = header.nextElementSibling;
+            content.classList.toggle('show');
+            header.lastElementChild.textContent = content.classList.contains('show') ? '▲' : '▼';
+        };
+    });
+}
+
+
+
+renderProp(key, value) {
+    // 1. DECIMAL FIELDS
+    const decimalKeys = [
+        'deviceWidth', 'deviceHeight', 'deviceDepth', 'standHeight',
+        'textSize', 'ledRadius', 'ledHeight', 'ledBlinkPeriod',
+        'highTextSize', 'highLineWidth', 'highDotRadius'
+    ];
+    const isDecimal = decimalKeys.includes(key);
+
+    // 2. POSITION/VECTOR FIELDS (Ensuring x, y, z are always present)
+    const isVector = key.toLowerCase().includes('position') || key.toLowerCase().includes('size') || key === 'ledOffset';
+
+    let inputHtml = '';
+
+    // SPECIAL CASE: faceTextures
+    if (key === 'faceTextures') {
+        const tex = value || {};
+        const sides = ['front', 'back', 'left', 'right', 'top', 'bottom'];
+        let html = `<div class="texture-group"><div class="texture-header">faceTextures</div>`;
+        sides.forEach(side => {
+            const currentPath = tex[side] || 'none';
+            html += `
+                <div class="texture-row" style="padding-left:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${side.charAt(0).toUpperCase() + side.slice(1)}:</span>
+                    <button type="button" class="file-btn" onclick="window.editorInstance.pickTexture('${side}')">Pick File</button>
+                </div>
+                <div class="texture-path-text" data-side="${side}" style="padding-left:15px; margin-bottom:10px;">${currentPath}</div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+    // SPECIAL CASE: plugInBoxTextures
+    if (key === 'plugInBoxTextures') {
+        const tex = value || {};
+        const sides = ['pfront', 'pback'];
+        let html = `<div class="texture-group"><div class="texture-header">plugInBoxTextures</div>`;
+        sides.forEach(side => {
+            const currentPath = tex[side] || 'none';
+            html += `
+                <div class="texture-row" style="padding-left:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${side.charAt(0).toUpperCase() + side.slice(1)}:</span>
+                    <button type="button" class="file-btn" onclick="window.editorInstance.pickTexture('${side}')">Pick File</button>
+                </div>
+                <div class="texture-path-text" data-side="${side}" style="padding-left:15px; margin-bottom:10px;">${currentPath}</div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+    if (key === 'endFeedTextures') {
+        const tex = value || {};
+        const sides = ['efront', 'eback'];
+        let html = `<div class="texture-group"><div class="texture-header">endFeedTextures</div>`;
+        sides.forEach(side => {
+            const currentPath = tex[side] || 'none';
+            html += `
+                <div class="texture-row" style="padding-left:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${side.charAt(0).toUpperCase() + side.slice(1)}:</span>
+                    <button type="button" class="file-btn" onclick="window.editorInstance.pickTexture('${side}')">Pick File</button>
+                </div>
+                <div class="texture-path-text" data-side="${side}" style="padding-left:15px; margin-bottom:10px;">${currentPath}</div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    // CASE: Orientation dropdown
+    if (key === 'roomType') {
+        const options = ['room', 'container'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'category') {
+        const options = ['power', 'cooling', 'electrical', 'networking','IT','safety', 'fire'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'orientation') {
+        const options = ['Front', 'Back', 'Left', 'Right', 'Top', 'Bottom'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'pipeOrientation') {
+        const options = ['Horizontal_FrontBack', 'Horizontal_LeftRight', 'Vertical'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'labelOrientation') {
+        const options = ['Front', 'Back', 'Left', 'Right'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'deviceOrientation') {
+        const options = ['Front', 'Back', 'Left', 'Right', 'Top', 'Bottom'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'ductOrientation') {
+        const options = ['Horizontal_FrontBack', 'Horizontal_LeftRight', 'Vertical'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'clockType') {
+        const options = ['LED', 'LCD'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'plugInBoxPosition') {
+        const options = ['Front', 'Back', 'Below', 'Above'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+
+
+/*
+    else if (key === 'Front_Side_Opening') {
+        const options = ['Close', 'Left', 'Right', 'Straight'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'Rear_Side_Opening') {
+        const options = ['Close', 'Left', 'Right', 'Straight'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+*/
+    // ['front_PipeBendStatus','rear_PipeBendStatus','front_ExtendedPipeBendStatus','rear_ExtendedPipeBendStatus']
+    else if (key === 'F_B1_Sts' || key === 'F_B2_Sts' || key === 'F_B3_Sts' ||
+             key === 'R_B1_Sts' || key === 'R_B2_Sts' || key === 'R_B3_Sts') {
+        const options = [
+            'Close', 
+            'Enable', 
+        ];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            const isSelected = String(value).trim().toUpperCase() === opt.toUpperCase();
+            inputHtml += `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'F_D1_Sts' || key === 'F_D2_Sts' || key === 'F_D3_Sts' ||
+             key === 'R_D1_Sts' || key === 'R_D2_Sts' || key === 'R_D3_Sts') {
+        const options = [
+            'Close', 
+            'Enable', 
+        ];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            const isSelected = String(value).trim().toUpperCase() === opt.toUpperCase();
+            inputHtml += `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+
+
+/*
+    else if (key === 'Front_PipeBend' || key === 'Rear_PipeBend' || key === 'front_ExtendedPipeBend' || key === 'rear_ExtendedPipeBend') {
+        const options = [
+            'Close', 
+            'Left', 
+            'Right', 
+            'Straight', 
+            'Left & Right', 
+            'Left & Straight', 
+            'Right & Straight', 
+            'Left & Right & Straight', 
+            'Up', 
+            'Down', 
+            'Up & Down', 
+            'Up & Down & Left', 
+            'Up & Down & Right', 
+            'Up & Down & Left & Right'
+        ];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            const isSelected = String(value).trim().toUpperCase() === opt.toUpperCase();
+            inputHtml += `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+*/
+
+    else if (key === 'doorType') {
+        const options = ['Single', 'Double'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'textFont') {
+        const options = ['Arial', 'Arial Black', 'Arial Narrow', 'Times Roman', 'Calibri', 'Cavolini', 'Courier New' ];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+
+    else if (key === 'ledEnabled' || key === 'screenEnabled' || key === 'fanEnabled') {
+        // Remove trailing spaces and normalize comparison
+        const options = ['true', 'false'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        
+        options.forEach(opt => {
+            // Convert 'value' to string to ensure "true" === "true" comparison works
+            const isSelected = String(value).trim().toLowerCase() === opt;
+            inputHtml += `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+  
+    // CASE: fanOnValue - text input for the Zabbix value that means ON
+    else if (key === 'fanOnValue') {
+        inputHtml += `<input type="text" class="prop-input" data-key="${key}" value="${value || ''}" 
+            placeholder="e.g., 1, ON, 48" title="Zabbix value that indicates Fan is ON">`;
+    }
+
+    // EDUCT RELATED
+    else if (key === 'enableEndFeedRight' || key === 'enableEndFeedLeft' || key === 'enableHangingScrews' || key === 'flowAnimation') {
+        const options = ['Enable', 'Close'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    else if (key === 'arrowFlowDirection') {
+        const options = ['LeftToRight', 'RightToLeft'];
+        inputHtml += `<select class="prop-input" data-key="${key}">`;
+        options.forEach(opt => {
+            inputHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`;
+        });
+        inputHtml += '</select>';
+    }
+    // CASE: Vector Objects (Position, Size, etc.)
+    else if (isVector && typeof value === 'object' && value !== null) {
+
+        // --- PINPOINT CORRECTION START ---
+        let fields = [];
+        if (key.toLowerCase().includes('position') || key === 'ledOffset') {
+            fields = ['x', 'y', 'z']; // Always show 3 axes for positions
+        } else if (key === 'textbgSize' || key === 'screenSize' || key === 'highTextbgSize') {
+            fields = ['width', 'height']; // No 'depth' for these specific 2D sizes
+        } else if (key.toLowerCase().includes('size')) {
+            fields = ['width', 'height', 'depth']; // Standard 3D sizes
+        } else {
+            fields = Object.keys(value); // Fallback to existing keys
+        }
+        // --- PINPOINT CORRECTION END ---
+
+        inputHtml += '<div class="vector-inputs" style="display:flex; gap:4px; align-items:center;">';
+        fields.forEach(comp => {
+            const val = (value && value[comp] !== undefined) ? value[comp] : 0;
+            inputHtml += `
+                <span style="font-size:11px; color:#666;">${comp}</span>
+                <input class="prop-input" data-key="${key}.${comp}" type="number" step="0.01"
+                       value="${parseFloat(val).toFixed(2)}" style="width:50px; padding:2px;">`;
+        });
+        inputHtml += '</div>';
+    }
+    // CASE: Colors
+    else if (typeof value === 'number' && key.toLowerCase().includes('color')) {
+        const hexValue = value >= 0 ? `0x${Math.floor(value).toString(16).padStart(6, '0').toUpperCase()}` : '0xFFFFFF';
+        inputHtml += `<input class="prop-input" data-key="${key}" value="${hexValue}">`;
+    }
+    // CASE: Decimals/Numbers
+    else if (isDecimal || typeof value === 'number') {
+        inputHtml += `<input class="prop-input" data-key="${key}" type="number" step="0.01" value="${parseFloat(value || 0).toFixed(2)}">`;
+    }
+    // CASE: General Strings
+    else {
+        inputHtml += `<input class="prop-input" data-key="${key}" value="${value || ''}">`;
+    }
+
+
+    return `<div class="prop-row" style="display:flex; align-items:center; margin-bottom:8px;">
+                <label style="min-width:120px; font-size:13px;">${key}:</label>
+                ${inputHtml}
+            </div>`;
+}
+
+
+// New: Toggle group
+toggleGroup(header) {
+  const content = header.nextElementSibling;
+  content.classList.toggle('show');
+  header.querySelector('span:last-child').textContent = content.classList.contains('show') ? '▲' : '▼';
+}
+
+async handleTextureUpload(e, side) {
+    const file = e.target.files[0];
+    if (!file || !this.selectedDevice) return;
+
+    // naming: ups1_front.png
+    const fileName = `${this.selectedDevice}_${side}.png`;
+
+    const formData = new FormData();
+    formData.append('texture', file);
+    formData.append('filename', fileName);
+    formData.append('room', this.selectedFile);
+    formData.append('device', this.selectedDevice);
+    formData.append('side', side);
+
+    try {
+        const response = await fetch('/api/uploadtexture', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            //alert(`Uploaded ${side} texture successfully!`);
+            // Refresh properties to show new path and reload 3D preview
+            await this.loadDeviceProperties(this.selectedFile, this.selectedDevice);
+            this.updatePreview();
+        } else {
+            alert('Upload failed: ' + data.error);
+        }
+    } catch (error) {
+        //console.error('Upload error', error);
+        alert('Network error during upload');
+    }
+}
+
+/*
+applyChanges() {
+    if (!this.selectedFile || !this.selectedDevice) {
+        alert("Select a device first.");
+        return;
+    }
+
+    const changes = {};
+    const inputs = this.propertiesEditor.querySelectorAll('.prop-input');
+
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        let val = input.value.trim();
+
+        // Check if property should be a number (float)
+        const isDecimal = DECIMAL_PROPS.some(p => key.startsWith(p));
+
+        if (val === "" || val.toLowerCase() === "null") {
+            val = null;
+        } else if (val.toLowerCase() === "true") {
+            val = true;
+        } else if (val.toLowerCase() === "false") {
+            val = false;
+        } else if (val.startsWith("0x")) {
+            // Keep hex as string for the Python formatter to handle
+        } else if (!isNaN(val) && isDecimal) {
+            val = parseFloat(val);
+        } else if (!isNaN(val)) {
+            val = Number(val);
+        }
+
+        changes[key] = val;
+    });
+
+    this.saveDeviceChanges(changes);
+    //this.updatePreview();
+}
+*/
+
+applyChanges() {
+    if (!this.selectedFile || !this.selectedDevice) {
+        alert("Select a device first.");
+        return;
+    }
+
+    const changes = {};
+    const inputs = this.propertiesEditor.querySelectorAll('.prop-input');
+
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        if (!key) return;
+
+        let val = input.value.trim();
+
+        // Check if property should be a number (float)
+        const isDecimal = DECIMAL_PROPS.some(p => key.startsWith(p)) || key.startsWith("plugInBoxPositions.");
+
+        if (val === "" || val.toLowerCase() === "null") {
+            val = null;
+        } else if (val.toLowerCase() === "true") {
+            val = true;
+        } else if (val.toLowerCase() === "false") {
+            val = false;
+        } else if (val.startsWith("0x")) {
+            // Keep hex as string for the Python formatter to handle
+        } else if (!isNaN(val) && isDecimal) {
+            val = parseFloat(val);
+        } else if (!isNaN(val)) {
+            val = Number(val);
+        }
+
+        // Handle nested array indexing (e.g., key = "plugInBoxPositions.0")
+        if (key.includes('.')) {
+            const [parentKey, indexStr] = key.split('.');
+            const idx = parseInt(indexStr, 10);
+
+            if (!isNaN(idx)) {
+                if (!Array.isArray(changes[parentKey])) {
+                    changes[parentKey] = [];
+                }
+                changes[parentKey][idx] = val;
+                return;
+            }
+        }
+
+        changes[key] = val;
+    });
+
+    this.saveDeviceChanges(changes);
+}
+
+// New: Save to backend
+async saveDeviceChanges(changes) {
+  try {
+    const response = await fetch('/api/updatedeviceprops', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room: this.selectedFile, device: this.selectedDevice, changes })
+    });
+    const data = await response.json();
+    if (data.success) {
+      //alert('Properties updated! Preview reloaded.');
+      this.loadDeviceProperties(this.selectedFile, this.selectedDevice); // Reload form
+      this.updatePreview();
+    } else {
+      alert('Update failed: ' + data.error);
+    }
+  } catch (error) {
+    //console.error('Save error', error);
+  }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Export Function
+function exportProject() {
+    window.location.href = '/export_project';
+}
+
+// Restore Helper: Triggers the hidden file input
+function triggerRestore() {
+    document.getElementById('restore-input').click();
+}
+
+// Restore Handler: Sends the file to Python
+function handleRestore(input) {
+    if (!input.files || input.files.length === 0) return;
+
+    if (!confirm("Warning: This will overwrite all current i3DLive files. Continue?")) return;
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+
+    fetch('/restore_project', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.status === 'success') {
+            window.location.reload();
+        }
+    })
+    .catch(error => {
+        //console.error('Error:', error);
+        alert("Restore failed. Check console for details.");
+    });
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+}
+
+// Helper to handle file picking
+pickTexture(side) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/\*';
+    input.onchange = (e) => this.handleTextureUpload(e, side);
+    input.click();
+}
+
+
+} // end of class EditorTree function
+
+// INITIALIZATION: Replace the block at the very bottom
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if instance already exists to prevent double-init
+    if (!window.editorInstance) {
+        const editor = new EditorTree();
+        //window.editorInstance = editor;
+        window.editor = editor;
+
+        // Ensure Room functions are also globally accessible
+        window.promptAddRoom = () => editorInstance.promptAddRoom();
+        window.confirmRemoveRoom = () => editorInstance.confirmRemoveRoom();
+
+    }
+});
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// --- EXPORT & RESTORE UTILITIES ---
+
+// 1. Export Function
+function exportProject() {
+    //console.log("Exporting project...");
+    window.location.href = '/export_project';
+}
+
+// 2. Trigger the hidden file input
+function triggerRestore() {
+    const input = document.getElementById('restore-input');
+    if (input) {
+        input.click();
+    } else {
+        //console.error("Restore input element not found!");
+    }
+}
+
+// 3. Handle the actual file upload
+function handleRestore(input) {
+    if (!input.files || input.files.length === 0) return;
+
+    if (!confirm("CRITICAL WARNING: This will DELETE the current i3DLive folder on the server and replace it with the ZIP content. Continue?")) {
+        input.value = ''; // Reset input
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+
+    // Show a simple status (optional)
+    const restoreBtn = document.getElementById('restore-btn');
+    const originalText = restoreBtn.innerText;
+    restoreBtn.innerText = "Restoring...";
+    restoreBtn.disabled = true;
+
+    fetch('/restore_project', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.status === 'success') {
+            window.location.reload();
+        }
+    })
+    .catch(error => {
+        //console.error('Error:', error);
+        alert("Restore failed. Check server logs.");
+    })
+    .finally(() => {
+        restoreBtn.innerText = originalText;
+        restoreBtn.disabled = false;
+        input.value = ''; // Reset input
+    });
+}

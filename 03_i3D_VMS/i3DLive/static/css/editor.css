@@ -1,0 +1,418 @@
+.editor-container {
+    display: flex;
+    height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.pane {
+    border-right: 1px solid #ddd;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.left-pane { width: 15%; background: #f8f9fa; }
+.middle-pane { width: 70%; background: #000; position: relative; }
+.right-pane { width: 35%; background: #f8f9fa; }
+
+.pane-header {
+    background: #007bff;
+    color: white;
+    padding: 12px;
+    font-weight: bold;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.tree-view {
+    flex: 1;
+    overflow: auto;
+    padding: 10px;
+    max-height: calc(100vh - 200px);  /*Limit tree height */
+}
+
+.tree-file, .tree-item {
+    padding: 3px 7px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+    user-select: none;
+    font-size: 13px;
+}
+
+.tree-file:hover, .tree-item:hover {
+    background: #e9ecef;
+}
+
+.tree-item.selected {
+    background: #007bff;
+    color: white;
+}
+
+.tree-node {
+    display: flex;
+    align-items: center;
+}
+
+.toggle {
+    margin-right: 8px;
+    font-size: 12px;
+    width: 16px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.tree-children {
+    max-height: 150px;  /* ~5-6 devices visible */
+    overflow-y: auto;   /* Scroll inside expanded list */
+    padding-left: 24px;
+    background: #f1f3f4;
+    border: 1px solid #ddd;  /* Visual container */
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+#three-canvas-container {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+}
+
+#code-editor {
+    flex: 1;
+    padding: 20px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', monospace;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+
+.library-section {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.section-header {
+    font-weight: bold;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.library-dropdown {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    max-height: 220px;  /* ~5 items visible */
+    overflow-y: auto;
+}
+
+.button-group {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary { background: #007bff; color: white; }
+.btn-primary:hover { background: #0056b3; }
+.btn-danger { background: #dc3545; color: white; }
+.btn-danger:hover { background: #c82333; }
+
+.separator {
+    height: 1px;
+    background: #eee;
+    margin: 10px 0;
+}
+
+/* Custom Scrollable Dropdown */
+.custom-select {
+    position: relative;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.select-button {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 13px;
+    min-height: 36px;
+}
+
+.select-button:hover {
+    background: #f8f9fa;
+    border-color: #007bff;
+}
+
+.select-arrow {
+    transition: transform 0.2s;
+}
+
+.select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 140px;  /* FIXED: Exactly 5-6 items */
+    overflow-y: auto;   /* FIXED: Scrollbar appears */
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: none;  /* Hidden by default */
+}
+
+.select-dropdown.show {
+    display: block;
+}
+
+.dropdown-option {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+}
+
+.dropdown-option:hover {
+    background: #e9ecef;
+}
+
+.dropdown-option:last-child {
+    border-bottom: none;
+}
+
+.section-header {
+    font-weight: bold;
+    font-size: 12px;
+    color: #666;
+    margin: 12px 0 6px 0;  /* Increased top margin */
+    text-transform: uppercase;
+}
+
+.tree-item.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Pulsing highlight for 3D */
+@keyframes pulse-highlight {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.device-highlight {
+    animation: pulse-highlight 1s infinite;
+}
+
+#properties-editor { height: calc(100% - 40px); overflow-y: auto; padding: 10px; }
+.properties-group { margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; }
+.group-header { background: #f5f5f5; padding: 8px 12px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+.group-content { padding: 12px; display: none; }
+.group-content.show { display: block; }
+.prop-row { display: flex; align-items: center; margin-bottom: 8px; }
+.prop-label { width: 140px; font-size: 14px; color: #333; }
+.prop-input { flex: 1; padding: 4px 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; }
+.prop-input:focus { outline: none; border-color: #4CAF50; }
+.file-input { display: none; }
+.file-btn { background: #2196F3; color: white; padding: 4px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.apply-btn { width: 100%; background: #4CAF50; color: white; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+.apply-btn:hover { background: #45a049; }
+.vector-inputs { display: flex; gap: 5px; }
+.vector-inputs input { width: 60px; }
+
+
+.right-pane {
+  display: flex;
+  flex-direction: column;
+}
+#code-editor, #props-editor {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin: 5px;
+}
+
+.properties-group { margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; }
+.group-header { background: #f5f5f5; padding: 8px 12px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+.group-content { padding: 12px; display: none; }
+.group-content.show { display: block; }
+.prop-row { display: flex; align-items: center; margin-bottom: 8px; }
+.prop-label { width: 140px; font-size: 14px; color: #333; }
+.prop-input { flex: 1; padding: 4px 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; }
+.vector-inputs { display: flex; gap: 5px; }
+.vector-inputs input { width: 60px; }
+.file-btn { background: #2196F3; color: white; padding: 4px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.apply-btn { width: 100%; background: #4CAF50; color: white; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+.group-content { display: none; }
+.group-content.show { display: block; }
+
+
+/* Custom color for texture paths */
+.texture-path-text {
+    color: #000000; 
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    word-break: break-all;
+    display: block;
+}
+
+/* Layout for texture buttons and labels */
+.texture-row {
+    margin-top: 8px;
+    padding-left: 15px; /* Indentation for Front, Back, etc. */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.texture-label {
+    font-weight: bold;
+    min-width: 60px;
+}
+
+.texture-upload-btn {
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    border-radius: 3px;
+}
+
+.texture-upload-btn:hover {
+    background: #555;
+}
+
+.texture-group {
+    border: 1px solid #444;
+    padding: 8px;
+    margin-top: 10px;
+    background: #EEEEEE;
+    border-radius: 4px;
+}
+
+
+/* Container for the buttons to keep them side-by-side */
+.editor-controls {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background: #FFFFFF;
+    border-bottom: 1px solid #333;
+}
+
+/* Base style for all editor buttons */
+.editor-controls button {
+    flex: 1;
+    padding: 8px 5px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 12px;
+    transition: background 0.2s;
+    color: white;
+}
+
+/* Green "Add" Style */
+.add-btn {
+    background-color: #007bff; /*#28a745; !important; */
+}
+.add-btn:hover {
+    /* background-color: #218838; /* !important; */
+    filter: brightness(0.8);
+}
+
+/* Red "Remove" Style */
+.remove-btn {
+    background-color: #dc3545; /* important */
+}
+.remove-btn:hover {
+    /* background-color: #c82333; /* important */
+    filter: brightness(0.8);
+}
+
+/* Container for the panes */
+.editor-container {
+    display: flex;
+    transition: all 0.3s ease;
+}
+
+/* Base Pane Styling */
+.pane {
+    transition: width 0.3s ease, min-width 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
+
+/* Updated Project Actions Container */
+.project-actions {
+    border-bottom: 1px solid #ddd; /* Adds a visual separator between Project and Room controls */
+    margin-bottom: 0; /* Align tightly with the next section */
+}
+
+/* Updated Project Button to match Add/Remove style exactly */
+.proj-btn {
+    flex: 1;
+    padding: 8px 5px; /* Matches your .editor-controls button padding */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 12px;
+    transition: background 0.2s;
+    color: white;
+    text-align: center; /* Center text like standard buttons */
+}
+
+/* Green "Export" (Matching your Add Room style) */
+.export-btn {
+    background-color: #27ae60; 
+}
+.export-btn:hover {
+    filter: brightness(0.8);
+}
+
+/* Red "Restore" (Matching your Remove Room style) */
+.restore-btn {
+    background-color: #e67e22; 
+}
+.restore-btn:hover {
+    filter: brightness(0.8);
+}
+
+/* Overwrite the emoji icons if you want pure text like Add/Remove buttons */
+/* If you want the icons back, uncomment the lines below */
+/* .export-btn::before { content: '📤 '; }  */
+/* .restore-btn::before { content: '📥 '; } */
